@@ -10,7 +10,7 @@ case class Transaction(id: String, created: DateTime, description: String, amoun
 object Transaction {
   implicit val yourJodaDateReads = Reads.jodaDateReads("yyyy-MM-dd'T'HH:mm:ss.SSSZ").orElse(Reads.jodaDateReads("yyyy-MM-dd'T'HH:mm:ssZ"))
   implicit val yourJodaDateWrites = Writes.jodaDateWrites("yyyy-MM-dd'T'HH:mm:ss.SSSZ'")
-  
+
   implicit val transactionReads: Reads[Transaction] = (
     (JsPath \ "id").read[String] and
     (JsPath \ "created").read[DateTime] and

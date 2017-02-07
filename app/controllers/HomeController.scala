@@ -37,13 +37,13 @@ class HomeController @Inject()(val messagesApi: MessagesApi, ws: WSClient, cache
   def showTransactions = Action.async { implicit request =>
     cache.get[AuthTokenResponse]("1").map { authToken =>
       getAccountId(authToken).flatMap { accountId =>
-        ws.url(s"https://api.monzo.com/transactions?account_id=$accountId").withHeaders(("Authorization", s"Bearer ${authToken.access_token}")).get.map {
+        ws.url(s"https://api.monzo.com/transactions?account_id=$accountId").withHeaders(("Authorization", s"Bearer ${authToken.accessToken}")).get.map {
           response =>
             cache.set("1", authToken)
 
             val transactions = response.json.as[Transactions]
 
-            val b = calculateRoundupsByMonth(accountId, transactions)(authToken.access_token)
+            val b = calculateRoundupsByMonth(accountId, transactions)(authToken.accessToken)
 
             Ok(views.html.transactions(b))
         }
@@ -52,9 +52,9 @@ class HomeController @Inject()(val messagesApi: MessagesApi, ws: WSClient, cache
   }
 
   def getAccountId(authToken: AuthTokenResponse): Future[String] = {
-    ws.url("https://api.monzo.com/accounts").withHeaders(("Authorization", s"Bearer ${authToken.access_token}")).get.map {
+    ws.url("https://api.monzo.com/accounts").withHeaders(("Authorization", s"Bearer ${authToken.accessToken}")).get.map {
       response =>
-        (response.json \\ "id").head.as[String]
+        (response.json \\ "id").headOption.map(_.as[String]).getOrElse("")
     }
   }
 
