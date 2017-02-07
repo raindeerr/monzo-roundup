@@ -3,7 +3,7 @@ package controllers
 import java.util.UUID
 import javax.inject._
 
-import models.{AuthToken, AuthTokenResponse, Months, Transactions}
+import models._
 import play.api._
 import play.api.cache.CacheApi
 import play.api.mvc._
@@ -13,7 +13,6 @@ import play.api.libs.ws.WSClient
 import scala.collection.immutable.ListMap
 import scala.concurrent.Future
 import scala.math.BigDecimal.RoundingMode
-
 import scala.concurrent.ExecutionContext.Implicits.global
 
 @Singleton
@@ -43,9 +42,20 @@ class HomeController @Inject()(val messagesApi: MessagesApi, ws: WSClient, cache
 
             val transactions = response.json.as[Transactions]
 
+            val data = Map(
+              "metadata[roundedUp]" -> Seq("false")
+            )
+
+            ws.url("https://api.monzo.com/transactions/tx_00009HBMS9gmVnl99rctcn").withHeaders(("Authorization", s"Bearer ${authToken.accessToken}")).patch(data).map {
+              response =>
+                //println(s"----------- response:  ${response.body}")
+            }
+
+            val groupedByMonth = groupTransactionsByMonth(transactions)
+
             val b = calculateRoundupsByMonth(accountId, transactions)(authToken.accessToken)
 
-            Ok(views.html.transactions(b))
+            Ok(views.html.transactions(b, groupedByMonth))
         }
       }
     }.getOrElse(Future.successful(NotFound))
@@ -58,10 +68,16 @@ class HomeController @Inject()(val messagesApi: MessagesApi, ws: WSClient, cache
     }
   }
 
+  def groupTransactionsByMonth(transactions: Transactions): Seq[((Int, Int), Seq[Transaction])] = {
+    val transactionsWithoutTopUps = transactions.transactions.filterNot(_.isLoad)
+    val groupedAndSortedByMonth = transactionsWithoutTopUps.groupBy(a => (a.created.getMonthOfYear, a.created.getYear)).toSeq.sortWith(_._1._1 > _._1._1).sortWith(_._1._2 > _._1._2)
+    groupedAndSortedByMonth
+  }
+
   def calculateRoundupsByMonth(accountId: String, transactions: Transactions)(accessToken: String): Map[String, BigDecimal] = {
     val byMonth = ListMap(transactions.transactions.filterNot(_.isLoad).groupBy(a => (a.created.getMonthOfYear, a.created.getYear)).toSeq.sortWith(_._1._1 > _._1._1).sortWith(_._1._2 > _._1._2): _*)
 
-    val b: Map[String, BigDecimal] = byMonth.map {
+    byMonth.map {
       month =>
 
         val roundUps = month._2.map { eachMonth =>
@@ -73,6 +89,9 @@ class HomeController @Inject()(val messagesApi: MessagesApi, ws: WSClient, cache
           if (roundUp.equals(BigDecimal(0))) BigDecimal(1) // £1 roundups when transaction amount is whole number
           else roundUp
         }.foldLeft(BigDecimal(0))(_ + _)
+
+
+
 
         val formData = Map(
           "account_id" -> Seq(accountId),
@@ -87,9 +106,6 @@ class HomeController @Inject()(val messagesApi: MessagesApi, ws: WSClient, cache
 
         (s"${Months(month._1._1)} ${month._1._2}", roundUps)
     }
-    println(s"total to round up:  ${b.values.toSeq.foldLeft(BigDecimal(0))(_ + _)}")
-
-    b
   }
 
   def exchangeAuthForAccessToken(authorisationToken: String) = {
@@ -118,7 +134,7 @@ object MonzoAuth {
 
   val clientSecret: String = Play.current.configuration.getString("monzo.clientSecret").getOrElse("")
 
-  val redirectUri: String = "http://localhost:9000/oauth/callback"
+  val redirectUri: String = "http://localhost:9500/oauth/callback"
 
   def stateToken: String = UUID.randomUUID().toString
 

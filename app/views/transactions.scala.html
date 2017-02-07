@@ -1,8 +1,54 @@
-@(roundUps: Map[String, BigDecimal])
+@(roundUps: Map[String, BigDecimal], groupedByMonth: Seq[((Int, Int), Seq[Transaction])])
 
 @main("Transactions") {
 
   <h1>Round ups</h1>
+
+  @groupedByMonth.map { month =>
+
+      <h1>@Months(month._1._1) - @month._1._2 - @roundUps(s"${Months(month._1._1)} ${month._1._2}")</h1>
+
+      <table class="table table-striped">
+          <thead>
+              <tr>
+                  <th>Balance</th>
+                  <th>Amount</th>
+                  <th>Created</th>
+                  <th>Currency</th>
+                  <th>Description</th>
+                  <th>ID</th>
+                  <th>Merchant</th>
+                  <th>Metadata</th>
+                  <th>Notes</th>
+                  <th>Is Load?</th>
+                  <th>Settled</th>
+                  <th>Category</th>
+              </tr>
+          </thead>
+          <tbody>
+              @for(transaction <- month._2) {
+                  <tr>
+                      <td>@transaction.accountBalance</td>
+                      <td>@{transaction.amount / 100}</td>
+                      <td>@transaction.created</td>
+                      <td>@transaction.currency</td>
+                      <td>@transaction.description</td>
+                      <td>@transaction.id</td>
+                      <td>@transaction.merchant</td>
+                      <td>@transaction.metadata</td>
+                      <td>@transaction.notes</td>
+                      <td>@transaction.isLoad</td>
+                      <td>@transaction.settled</td>
+                      <td>@transaction.category</td>
+                  </tr>
+              }
+          </tbody>
+
+      </table>
+
+  }
+
+
 
   @roundUps.map { roundUp =>
     <p>@roundUp._1</p>
