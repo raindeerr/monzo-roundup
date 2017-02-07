@@ -1,0 +1,52 @@
+@(roundUps: Map[String, BigDecimal])
+
+@main("Transactions") {
+
+  <h1>Round ups</h1>
+
+  @roundUps.map { roundUp =>
+    <p>@roundUp._1</p>
+    <p>Total to round up: £@roundUp._2</p>
+  }
+
+  @**
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Balance</th>
+        <th>Amount</th>
+        <th>Created</th>
+        <th>Currency</th>
+        <th>Description</th>
+        <th>ID</th>
+        <th>Merchant</th>
+        <th>Metadata</th>
+        <th>Notes</th>
+        <th>Is Load?</th>
+        <th>Settled</th>
+        <th>Category</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for(transaction <- transactions.transactions) {
+        <tr>
+          <td>@transaction.account_balance</td>
+          <td>@{transaction.amount / 100}</td>
+          <td>@transaction.created</td>
+          <td>@transaction.currency</td>
+          <td>@transaction.description</td>
+          <td>@transaction.id</td>
+          <td>@transaction.merchant</td>
+          <td>@transaction.metadata</td>
+          <td>@transaction.notes</td>
+          <td>@transaction.is_load</td>
+          <td>@transaction.settled</td>
+          <td>@transaction.category</td>
+        </tr>
+      }
+    </tbody>
+
+  </table>
+  **@
+
+}
