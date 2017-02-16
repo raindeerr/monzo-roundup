@@ -1,0 +1,19 @@
+@(loginForm: Form[LoginForm])(implicit messages: Messages)
+
+@import helper.{form, inputText}
+
+@main("Moneybox") {
+
+
+    @form(action = controllers.routes.MoneyboxController.submitDetails) {
+
+        @inputText(loginForm("email"))
+
+        @inputText(loginForm("password"), 'type -> "password")
+
+        <button type="submit">Submit here</button>
+
+    }
+
+
+}
