@@ -1,6 +1,6 @@
 package repositories
 
-import controllers.EncryptedMoneyboxAuth
+import models.EncryptedMoneyboxAuth
 import play.api.Play
 import play.api.libs.json.Json
 import play.modules.reactivemongo.ReactiveMongoApi

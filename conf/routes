@@ -6,7 +6,6 @@
 GET     /                           controllers.HomeController.index
 GET     /oauth/monzo                controllers.HomeController.startAuth
 GET     /oauth/callback             controllers.AuthController.oauthCallback(code: String, state: String)
-#GET     /transactions               controllers.TransactionsController.showTransactions
 POST    /callback/transaction       controllers.WebhookController.receiveTransactionCreatedEvent
 
 GET     /moneybox                   controllers.MoneyboxController.enterDetails

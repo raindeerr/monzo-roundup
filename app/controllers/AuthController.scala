@@ -2,12 +2,15 @@ package controllers
 
 import javax.inject.Inject
 
+import auth.AuthHelpers
+import play.api.libs.json.JsValue
 import play.api.libs.ws.WSClient
 import play.api.mvc.{Action, Controller, Session}
 import repositories.MonzoRepository
 import play.api.{Configuration, Logger}
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 class AuthController @Inject() (ws: WSClient, configuration: Configuration) extends Controller {
 
@@ -34,8 +37,8 @@ class AuthController @Inject() (ws: WSClient, configuration: Configuration) exte
     }
   }
 
-  def registerForWebhook(accountId: String, accessToken: String) = {
-    val webhookUrl = configuration.getString("webhook.callback.url").getOrElse("http://localhost:9500")//"https://monzo-roundup.herokuapp.com/callback/transaction"
+  def registerForWebhook(accountId: String, accessToken: String): Future[JsValue] = {
+    val webhookUrl = configuration.getString("webhook.callback.url").getOrElse("http://localhost:9000")
 
     val formData = Map(
       "account_id" -> Seq(accountId),
@@ -47,7 +50,7 @@ class AuthController @Inject() (ws: WSClient, configuration: Configuration) exte
         Logger.info(s"[AuthController][registerForWebhook] - Status code: ${response.status}")
         Logger.info(s"[AuthController][registerForWebhook] - Response body: ${response.body}")
         Logger.info(s"[AuthController][registerForWebhook] - created webhook for $accountId at $webhookUrl")
-        Ok
+        response.json
     }
   }
 

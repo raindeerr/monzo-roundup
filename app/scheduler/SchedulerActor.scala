@@ -3,7 +3,7 @@ package scheduler
 import javax.inject.Inject
 
 import akka.actor.Actor
-import controllers.{AuthHelpers, MoneyboxAuthHelpers}
+import auth.{AuthHelpers, MoneyboxAuthHelpers}
 import org.joda.time.DateTime
 import play.api.Logger
 import play.api.libs.json.Json

@@ -2,7 +2,9 @@ package controllers
 
 import javax.inject.Inject
 
+import auth.MoneyboxAuthHelpers
 import crypto.CryptoHelpers
+import models.MoneyboxAuth
 import play.api.Play
 import play.api.data._
 import play.api.data.Forms._
@@ -26,47 +28,6 @@ object LoginForm {
   )
 }
 
-case class MoneyboxAuth(userId: String, bearerToken: String, emailAddress: String, password: String, roundUpBalance: BigDecimal = BigDecimal(0), monzoAccountId: String) {
-
-  def encrypt: EncryptedMoneyboxAuth = {
-    def enc(toEncrypt: String) = CryptoHelpers.encrypt(toEncrypt)
-    EncryptedMoneyboxAuth(
-      enc(userId),
-      enc(bearerToken),
-      enc(emailAddress),
-      enc(password),
-      roundUpBalance,
-      monzoAccountId
-    )
-  }
-
-}
-
-case class EncryptedMoneyboxAuth(userId: String, bearerToken: String, emailAddress: String, password: String, roundUpBalance: BigDecimal, monzoAccountId: String) {
-
-  def toMap: Map[String, String] =
-    Map(
-      "moneyboxUserId" -> userId,
-      "moneyboxBearerToken" -> bearerToken
-    )
-
-  def decrypt: MoneyboxAuth = {
-    def dec(toDecrypt: String) = CryptoHelpers.decrypt(toDecrypt)
-    MoneyboxAuth(
-      dec(userId),
-      dec(bearerToken),
-      dec(emailAddress),
-      dec(password),
-      roundUpBalance,
-      monzoAccountId
-    )
-  }
-}
-
-object EncryptedMoneyboxAuth {
-  implicit val formats: Format[EncryptedMoneyboxAuth] = Json.format[EncryptedMoneyboxAuth]
-}
-
 class MoneyboxController @Inject() (val messagesApi: MessagesApi, ws: WSClient) extends Controller with I18nSupport {
 
   val moneyboxRepository = MoneyboxRepository
@@ -79,7 +40,7 @@ class MoneyboxController @Inject() (val messagesApi: MessagesApi, ws: WSClient) 
     LoginForm.form.bindFromRequest.fold(
       formWithErrors => Future.successful(BadRequest(views.html.moneybox(formWithErrors))),
       data => {
-        val monzoAccountId = request.session.data.get("accountId").getOrElse("")
+        val monzoAccountId = request.session.data.getOrElse("accountId", "")
 
         MoneyboxAuthHelpers.moneyboxLogin(data.email, data.password, monzoAccountId).map {
           response =>
@@ -96,29 +57,4 @@ class MoneyboxController @Inject() (val messagesApi: MessagesApi, ws: WSClient) 
 
 }
 
-object MoneyboxAuthHelpers {
 
-  val moneyboxRepository = MoneyboxRepository
-
-  val ws = Play.current.injector.instanceOf[WSClient]
-
-  def moneyboxLogin(email: String, password: String, monzoAccountId: String) = {
-    ws.url("https://api.moneyboxapp.com/users/login")
-      .withHeaders("AppId" -> "8cb2237d0679ca88db6464", "AppVersion" -> "1.0.13")
-      .post(Json.obj("email" -> email, "password" -> password)).map {
-      result =>
-        val moneyboxAuth = MoneyboxAuth(
-          (result.json \ "User" \ "UserId").as[String],
-          (result.json \ "Session" \ "BearerToken").as[String],
-          email,
-          password,
-          monzoAccountId = monzoAccountId
-        ).encrypt
-
-        moneyboxRepository.save(monzoAccountId, moneyboxAuth)
-
-        result
-    }
-  }
-
-}
