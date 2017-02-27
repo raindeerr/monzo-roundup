@@ -1,11 +1,29 @@
-An application to help with round ups (like Moneybox) that will calculate the round ups for a month and push a feed item so you can manually top up your Moneybox account.
+# Continue using moneybox while also using Monzo!
 
-To run you will need to create a Client ID and a Client secret on https://developers.monzo.com
+## How it works
 
-Once you have these values they need to be passed into the application at runtime like so:
+The app uses webhooks to be notified of new transactions, works out the round up value, makes a running total and puts a nice feed item in Monzo!
 
-```bash
-  sbt -Dmonzo.clientId=your_client_id -Dmonzo.clientSecret=your_client_secret "run 9000"   
-```   
+Once every 24 hours it will send the round ups to moneybox as one off deposits. Currently I have had to hardcode an appId for moneybox. This may be different for each user, haven't actually tested this yet.
 
-Once the application has started navigate to http://localhost:9000 and click the big button to start the log in process, the rest will happen automagically!
+## Using the app 
+
+There is a hosted example at https://monzo-roundup.herokuapp.com that can be used. You have to auth with Monzo and also enter your moneybox login creds, these are encrypted so can't be viewed.
+
+You can also run your own version, which requires you to set the following environment variables:
+
+- `APPLICATION_SECRET` - needed by Play! for each deployment
+- `MONGODB_URI` - URI for the mongo database
+- `MONZO_CLIENT_ID` - Monzo API client ID
+- `MONZO_CLIENT_SECRET` - Monzo API client secret
+- `MONZO_REDIRECT_URI` - the URI to redirect to after Monzo auth
+- `CRYPTO_CURRENT_KEY` - the key used for encrypting the account details
+- `WEBHOOK_CALLBACK_URL` - the URL that Monzo will call when a transaction is created
+
+You can pass these in at the command line like:
+
+`sbt -DMONGODB_URI=this -DMONZO_CLIENT_ID=that "run 9000"`
+
+and so on.
+
+Please give me all feedback as this is something I've quickly pulled together and currently it works foo me and it'd be great if it works for others!
