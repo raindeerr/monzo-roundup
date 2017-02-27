@@ -70,7 +70,8 @@ class SchedulerActor @Inject() (ws: WSClient) extends Actor {
                             }
 
                           }
-
+                        case feedResponse =>
+                          Logger.error(s"[SchedulerActor][Tick] - Posting to monzo feed - status: ${feedResponse.status} - body: ${feedResponse.body}")
                       }
                     }
                   }
