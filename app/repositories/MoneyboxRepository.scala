@@ -21,7 +21,7 @@ trait MoneyboxRepository {
     val query = Json.obj("monzoAccountId" -> monzoAccountId, "userId" -> moneyboxAuth.userId)
     val update = Json.obj(
       "$set" -> Json.obj("monzoAccountId" -> monzoAccountId, "userId" -> moneyboxAuth.userId, "bearerToken" -> moneyboxAuth.bearerToken, "emailAddress" -> moneyboxAuth.emailAddress, "password" -> moneyboxAuth.password),
-      "$setOnInsert" -> Json.obj("roundUpBalance" -> BigDecimal(0))
+      "$setOnInsert" -> Json.obj("roundUpBalance" -> BigDecimal(0), "onePoundRoundUps" -> false, "topupEnabled" -> true)
     )
 
     for {
@@ -55,7 +55,7 @@ trait MoneyboxRepository {
   def findAllForRoundup = {
     for {
       collection <- collectionFuture
-      findAll <- collection.find(Json.obj("roundUpBalance" -> Json.obj("$gt" -> 1))).cursor[EncryptedMoneyboxAuth]().collect[Seq]()
+      findAll <- collection.find(Json.obj("roundUpBalance" -> Json.obj("$gt" -> 1), "topupEnabled" -> true)).cursor[EncryptedMoneyboxAuth]().collect[Seq]()
     } yield findAll
   }
 

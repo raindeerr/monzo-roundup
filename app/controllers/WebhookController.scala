@@ -27,6 +27,7 @@ class WebhookController @Inject() (messagesApi: MessagesApi, ws: WSClient) exten
       moneyboxRepository.findByAccountId(accountId).map {
         account =>
           account.map { accountDetails =>
+
             (json \ "data" \ "amount").as[BigDecimal].signum == -1
 
             if (!(json \ "data" \ "is_load").as[Boolean] && (json \ "data" \ "amount").as[BigDecimal].signum == -1) {
@@ -37,36 +38,44 @@ class WebhookController @Inject() (messagesApi: MessagesApi, ws: WSClient) exten
 
               val initialRoundUp = roundedValue - rawValue
 
-              val poundRoundUp = if (initialRoundUp == BigDecimal(0)) BigDecimal(1) else initialRoundUp // £1 round ups
+              val poundRoundUp = if (initialRoundUp == BigDecimal(0) && accountDetails.decrypt.onePoundRoundUps) BigDecimal(1) else initialRoundUp // £1 round ups
 
-              moneyboxRepository.updateBalance(accountId, a => a + poundRoundUp).map { wr =>
-                monzoRepository.findByAccountId(accountId).map { authStuffOption =>
-                  authStuffOption.map { authStuff =>
+              Logger.info(s"[WebhookController][receiveTransactionCreatedEvent] - pound round ups: ${accountDetails.decrypt.onePoundRoundUps} -- account: $accountId")
 
-                    val decryptedAuthStuff = authStuff.decrypt
+              if (poundRoundUp == BigDecimal(0)) {
+                Logger.info(s"[WebhookController][receiveTransactionCreatedEvent] - one pound round ups are switched off for ${accountDetails.decrypt.monzoAccountId}")
+                Ok
+              } else {
+                moneyboxRepository.updateBalance(accountId, a => a + poundRoundUp).map { wr =>
+                  monzoRepository.findByAccountId(accountId).map { authStuffOption =>
+                    authStuffOption.map { authStuff =>
 
-                    val data = Map(
-                      "metadata[roundedUp]" -> Seq("true")
-                    )
+                      val decryptedAuthStuff = authStuff.decrypt
 
-                    val transactionId = (json \ "data" \ "id").as[String]
+                      val data = Map(
+                        "metadata[roundedUp]" -> Seq("true")
+                      )
 
-                    def addRoundUpMetadata(accessToken: String) = ws.url(s"https://api.monzo.com/transactions/$transactionId").withHeaders(("Authorization", s"Bearer ${decryptedAuthStuff.accessToken}")).patch(data).map {
-                      case response if response.status == 200 =>
-                        Logger.info(s"[WebhookController][receiveTransactionCreatedEvent] - sending feed item to $accountId for $transactionId")
-                        sendRoundUpFeedItem(accessToken, accountId, poundRoundUp, transactionId)
-                      case response if response.status == 401 =>
-                        Logger.error(s"[WebhookController][receiveTransactionCreatedEvent] - 401 while sending feed item to $accountId for $transactionId")
-                        AuthHelpers.refreshAccess(decryptedAuthStuff) { accessDataOption =>
-                          accessDataOption.map { accessData =>
-                            sendRoundUpFeedItem(accessData.accessToken, accessData.accountId, poundRoundUp, transactionId)
+                      val transactionId = (json \ "data" \ "id").as[String]
+
+                      def addRoundUpMetadata(accessToken: String) = ws.url(s"https://api.monzo.com/transactions/$transactionId").withHeaders(("Authorization", s"Bearer ${decryptedAuthStuff.accessToken}")).patch(data).map {
+                        case response if response.status == 200 =>
+                          Logger.info(s"[WebhookController][receiveTransactionCreatedEvent] - sending feed item to $accountId for $transactionId")
+                          sendRoundUpFeedItem(accessToken, accountId, poundRoundUp, transactionId)
+                        case response if response.status == 401 =>
+                          Logger.error(s"[WebhookController][receiveTransactionCreatedEvent] - 401 while sending feed item to $accountId for $transactionId")
+                          AuthHelpers.refreshAccess(decryptedAuthStuff) { accessDataOption =>
+                            accessDataOption.map { accessData =>
+                              sendRoundUpFeedItem(accessData.accessToken, accessData.accountId, poundRoundUp, transactionId)
+                            }
                           }
-                        }
-                    }
-                    addRoundUpMetadata(decryptedAuthStuff.accessToken)
-                  }
-                }
+                      }
 
+                      addRoundUpMetadata(decryptedAuthStuff.accessToken)
+                    }
+                  }
+
+                }
               }
 
 

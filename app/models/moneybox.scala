@@ -3,7 +3,7 @@ package models
 import crypto.CryptoHelpers
 import play.api.libs.json.{Format, Json}
 
-case class MoneyboxAuth(userId: String, bearerToken: String, emailAddress: String, password: String, roundUpBalance: BigDecimal = BigDecimal(0), monzoAccountId: String) {
+case class MoneyboxAuth(userId: String, bearerToken: String, emailAddress: String, password: String, roundUpBalance: BigDecimal = BigDecimal(0), monzoAccountId: String, onePoundRoundUps: Boolean = false, topupEnabled: Boolean = true) {
 
   def encrypt: EncryptedMoneyboxAuth = {
     def enc(toEncrypt: String) = CryptoHelpers.encrypt(toEncrypt)
@@ -13,13 +13,15 @@ case class MoneyboxAuth(userId: String, bearerToken: String, emailAddress: Strin
       enc(emailAddress),
       enc(password),
       roundUpBalance,
-      monzoAccountId
+      monzoAccountId,
+      onePoundRoundUps,
+      topupEnabled
     )
   }
 
 }
 
-case class EncryptedMoneyboxAuth(userId: String, bearerToken: String, emailAddress: String, password: String, roundUpBalance: BigDecimal, monzoAccountId: String) {
+case class EncryptedMoneyboxAuth(userId: String, bearerToken: String, emailAddress: String, password: String, roundUpBalance: BigDecimal, monzoAccountId: String, onePoundRoundUps: Boolean = false, topupEnabled: Boolean = true) {
 
   def toMap: Map[String, String] =
     Map(
@@ -35,7 +37,9 @@ case class EncryptedMoneyboxAuth(userId: String, bearerToken: String, emailAddre
       dec(emailAddress),
       dec(password),
       roundUpBalance,
-      monzoAccountId
+      monzoAccountId,
+      onePoundRoundUps,
+      topupEnabled
     )
   }
 }
