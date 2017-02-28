@@ -55,7 +55,7 @@ trait MoneyboxRepository {
   def findAllForRoundup = {
     for {
       collection <- collectionFuture
-      findAll <- collection.find(Json.obj()).cursor[EncryptedMoneyboxAuth]().collect[Seq]()
+      findAll <- collection.find(Json.obj("roundUpBalance" -> Json.obj("$gt" -> 1))).cursor[EncryptedMoneyboxAuth]().collect[Seq]()
     } yield findAll
   }
 

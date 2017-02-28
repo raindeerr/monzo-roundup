@@ -1,13 +1,12 @@
 package auth
 
 import models.{AuthToken, AuthTokenResponse, EncryptedAuthTokenResponse}
-import play.api.Play
+import play.api.{Logger, Play}
 import play.api.libs.ws.WSClient
 import play.api.mvc.Request
 import repositories.MonzoRepository
 
 import scala.concurrent.Future
-
 import scala.concurrent.ExecutionContext.Implicits.global
 
 object AuthHelpers {
@@ -49,11 +48,15 @@ object AuthHelpers {
 
     ws.url("https://api.monzo.com/oauth2/token").post(formData).flatMap {
       refreshResponse =>
+        Logger.info(s"[AuthHelpers][refreshAccess] - status: ${refreshResponse.status} - body: ${refreshResponse.body}")
+
         val blah = refreshResponse.json.as[AuthTokenResponse].copy(accountId = authData.accountId)
 
         monzoRepository.save(blah.encrypt).flatMap { wr =>
+          Logger.info(s"[AuthHelpers][refreshAccess][monzoRepoSave] - ${blah.userId} - ${blah.accountId}")
           monzoRepository.findByAccountId(blah.accountId).map {
             a =>
+              Logger.info(s"[AuthHelpers][refreshAccess][monzoRepoFind + retry] - ${blah.userId} - ${blah.accessToken}")
               actionToRetry(a)
           }
         }

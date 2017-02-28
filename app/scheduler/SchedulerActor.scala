@@ -24,7 +24,7 @@ class SchedulerActor @Inject() (ws: WSClient) extends Actor {
 
   override def receive = {
     case CheckForRoundUps =>
-      Logger.info(s"[SchedulerActor][Tick] - calling scheduler with current time - ${DateTime.now()}")
+      Logger.info(s"[SchedulerActor][CheckForRoundUps] - calling scheduler with current time - ${DateTime.now()}")
       val hourOfDay = DateTime.now().getHourOfDay
       if (hourOfDay > 5 && hourOfDay < 8) {
         moneyboxRepository.findAllForRoundup.map { forRoundUp =>
@@ -34,10 +34,14 @@ class SchedulerActor @Inject() (ws: WSClient) extends Actor {
             val balanceToSave = decryptedMoneyboxDetails.roundUpBalance.setScale(0, RoundingMode.DOWN)
 
             if (balanceToSave == BigDecimal(0)) {
-              Logger.info(s"[SchedulerActor][Tick] - not enough to do a top up")
+              Logger.info(s"[SchedulerActor][CheckForRoundUps] - not enough to do a top up")
             } else {
-              Logger.info(s"[SchedulerActor][Tick] - doing a top up")
+              Logger.info(s"[SchedulerActor][CheckForRoundUps] - doing a top up")
               val headers = Seq("AppId" -> "8cb2237d0679ca88db6464", "AppVersion" -> "1.0.13", "Authorization" -> s"Bearer ${decryptedMoneyboxDetails.bearerToken}")
+
+              Logger.info(
+                s"""[SchedulerActor][CheckForRoundUps] - balance before top up: £${decryptedMoneyboxDetails.roundUpBalance} - topping up: £$balanceToSave
+                   |  for account: ${decryptedMoneyboxDetails.monzoAccountId} - user: ${decryptedMoneyboxDetails.emailAddress}""".stripMargin)
 
               val body = Json.obj(
                 "Currency" -> "GBP",
@@ -47,7 +51,8 @@ class SchedulerActor @Inject() (ws: WSClient) extends Actor {
 
               ws.url("https://api.moneyboxapp.com/payments").withHeaders(headers: _*).post(body).map {
                 case response if response.status == 200 =>
-                  Logger.info(s"[SchedulerActor][Tick] - Successfully topped up ${decryptedMoneyboxDetails.userId} with $balanceToSave")
+                  Logger.info(s"[SchedulerActor][CheckForRoundUps] - successful top up - ${response.status} - ${response.body}")
+                  Logger.info(s"[SchedulerActor][CheckForRoundUps] - Successfully topped up ${decryptedMoneyboxDetails.userId} with $balanceToSave")
                   moneyboxRepository.updateBalance(decryptedMoneyboxDetails.monzoAccountId, a => a - balanceToSave).map { _ =>
                     monzoRepository.findByAccountId(decryptedMoneyboxDetails.monzoAccountId).map { monzoAccount =>
                       sendMoneyboxTopUpFeedItem(
@@ -56,11 +61,11 @@ class SchedulerActor @Inject() (ws: WSClient) extends Actor {
                         balanceToSave
                       ).map {
                         case feedResponse if feedResponse.status == 200 =>
-                          Logger.info(s"[SchedulerActor][Tick] - Posting to monzo feed - status: ${feedResponse.status}")
+                          Logger.info(s"[SchedulerActor][CheckForRoundUps] - Posting to monzo feed - status: ${feedResponse.status}")
                         case feedResponse if feedResponse.status == 401 =>
-                          Logger.error(s"[SchedulerActor][Tick] - Posting to monzo feed - status: ${feedResponse.status}")
+                          Logger.error(s"[SchedulerActor][CheckForRoundUps] - Posting to monzo feed - status: ${feedResponse.status}")
                           monzoAccount.map { account =>
-                            Logger.info(s"[SchedulerActor][Tick] - Found monzo account - account: $account")
+                            Logger.info(s"[SchedulerActor][CheckForRoundUps] - Found monzo account - account: $account")
                             AuthHelpers.refreshAccess(account.decrypt){ newAuth =>
                               sendMoneyboxTopUpFeedItem(
                                 newAuth.map(_.decrypt.accessToken).getOrElse(""),
@@ -71,23 +76,52 @@ class SchedulerActor @Inject() (ws: WSClient) extends Actor {
 
                           }
                         case feedResponse =>
-                          Logger.error(s"[SchedulerActor][Tick] - Posting to monzo feed - status: ${feedResponse.status} - body: ${feedResponse.body}")
+                          Logger.error(s"[SchedulerActor][CheckForRoundUps] - Posting to monzo feed - status: ${feedResponse.status} - body: ${feedResponse.body}")
                       }
                     }
                   }
                 case response if response.status == 401 =>
-                  Logger.error(s"[SchedulerActor][Tick] - Need to re auth")
+                  Logger.error(s"[SchedulerActor][CheckForRoundUps] - Need to re auth moneybox for ${decryptedMoneyboxDetails.emailAddress}")
                   val dc = decryptedMoneyboxDetails
                   MoneyboxAuthHelpers.moneyboxLogin(dc.emailAddress, dc.password, dc.monzoAccountId).map { response =>
-                    Logger.info(s"[SchedulerActor][Tick] - Logged back into moneybox")
+                    Logger.info(s"[SchedulerActor][CheckForRoundUps] - Logged back into moneybox")
                     moneyboxRepository.findByAccountId(dc.monzoAccountId).map { a =>
                       val newHeaders = Seq("AppId" -> "8cb2237d0679ca88db6464", "AppVersion" -> "1.0.13", "Authorization" -> s"Bearer ${a.map(_.bearerToken).getOrElse("")}")
-                      ws.url("https://api.moneyboxapp.com/payments").withHeaders(newHeaders: _*).post(body).map { _ =>
-                        moneyboxRepository.updateBalance(a.map(_.monzoAccountId).getOrElse(""), a => a - balanceToSave)
+                      ws.url("https://api.moneyboxapp.com/payments").withHeaders(newHeaders: _*).post(body).map {
+                        case reauthedMoneyboxResponse if reauthedMoneyboxResponse.status == 200 =>
+                          moneyboxRepository.updateBalance(a.map(_.monzoAccountId).getOrElse(""), a => a - balanceToSave).map { _ =>
+                            monzoRepository.findByAccountId(decryptedMoneyboxDetails.monzoAccountId).map { monzoAccount =>
+                              sendMoneyboxTopUpFeedItem(
+                                monzoAccount.map(_.decrypt.accessToken).getOrElse(""),
+                                monzoAccount.map(_.decrypt.accountId).getOrElse(""),
+                                balanceToSave
+                              ).map {
+                                case feedResponse if feedResponse.status == 200 =>
+                                  Logger.info(s"[SchedulerActor][CheckForRoundUps] - Posting to monzo feed - status: ${feedResponse.status} - body: ${feedResponse.body}")
+                                case feedResponse if feedResponse.status == 401 =>
+                                  Logger.error(s"[SchedulerActor][CheckForRoundUps] - Posting to monzo feed - status: ${feedResponse.status} - body: ${feedResponse.body}")
+                                  monzoAccount.map { account =>
+                                    Logger.info(s"[SchedulerActor][CheckForRoundUps] - Found monzo account - account: $account")
+                                    AuthHelpers.refreshAccess(account.decrypt) { newAuth =>
+                                      sendMoneyboxTopUpFeedItem(
+                                        newAuth.map(_.decrypt.accessToken).getOrElse(""),
+                                        newAuth.map(_.decrypt.accountId).getOrElse(""),
+                                        balanceToSave
+                                      )
+                                    }
+
+                                  }
+                                case feedResponse =>
+                                  Logger.error(s"[SchedulerActor][CheckForRoundUps] - Posting to monzo feed - status: ${feedResponse.status} - body: ${feedResponse.body}")
+                              }
+                            }
+                          }
+                        case reauthedMoneyboxResponse if reauthedMoneyboxResponse.status == 401 =>
+                          Logger.error(s"[SchedulerActor][CheckForRoundUps] - reauth failed - aborting top up for user ${decryptedMoneyboxDetails.emailAddress} - ${decryptedMoneyboxDetails.monzoAccountId}")
                       }
                     }
                   }
-                case e => Logger.error(s"[SchedulerActor][Tick] - Call failed:  ${e.status} -- ${e.body}")
+                case e => Logger.error(s"[SchedulerActor][CheckForRoundUps] - Call failed:  ${e.status} -- ${e.body}")
 
               }
 
@@ -110,9 +144,9 @@ class SchedulerActor @Inject() (ws: WSClient) extends Actor {
       "account_id" -> Seq(accountId),
       "type" -> Seq("basic"),
       "url" -> Seq(""),
-      "params[title]" -> Seq(s"Topped up $formattedRoundUp to Moneybox for $accountId"),
-      "params[body]" -> Seq(s"Topped up $formattedRoundUp to Moneybox for $accountId"),
-      "params[image_url]" -> Seq("https://scontent-lht6-1.xx.fbcdn.net/v/t1.0-9/15871922_10212040156182063_1392533991348799017_n.jpg?oh=4669484d186b91d9b07911255a8d09d3&oe=5940244F")
+      "params[title]" -> Seq(s"£$formattedRoundUp sent to Moneybox"),
+      "params[body]" -> Seq(s"We've just topped up £$formattedRoundUp to your Moneybox account."),
+      "params[image_url]" -> Seq("https://www.oxcp.com/content/uploads/2016/07/Moneybox-small-440x390.png")
     )
 
     ws.url("https://api.monzo.com/feed").withHeaders(("Authorization", s"Bearer $accessToken")).post(formData).map {

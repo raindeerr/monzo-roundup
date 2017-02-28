@@ -18,5 +18,5 @@ class SchedulerModule extends AbstractModule with AkkaGuiceSupport {
 
 @Singleton
 class SchedulerStart @Inject()(system: ActorSystem, @Named("scheduler") longRunningActor: ActorRef) {
-  system.scheduler.schedule(10 seconds, 600 seconds, longRunningActor, CheckForRoundUps)
+  system.scheduler.schedule(10 seconds, 120 seconds, longRunningActor, CheckForRoundUps)
 }
