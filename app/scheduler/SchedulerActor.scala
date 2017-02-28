@@ -24,7 +24,6 @@ class SchedulerActor @Inject() (ws: WSClient) extends Actor {
 
   override def receive = {
     case CheckForRoundUps =>
-      Logger.info(s"[SchedulerActor][CheckForRoundUps] - calling scheduler with current time - ${DateTime.now()}")
       val hourOfDay = DateTime.now().getHourOfDay
       if (hourOfDay > 5 && hourOfDay < 8) {
         moneyboxRepository.findAllForRoundup.map { forRoundUp =>

@@ -52,7 +52,7 @@ class MoneyboxController @Inject() (val messagesApi: MessagesApi, ws: WSClient) 
   }
 
   def thanks = Action { implicit request =>
-    Ok("Sit tight and wait for the round ups!")
+    Ok(views.html.thanks())
   }
 
 }
