@@ -28,6 +28,8 @@ class SchedulerActor @Inject() (ws: WSClient) extends Actor {
       if (hourOfDay > 5 && hourOfDay < 8) {
         moneyboxRepository.findAllForRoundup.map { forRoundUp =>
           forRoundUp.foreach { roundUp =>
+            val poundSign = "\u00a3"
+
             val decryptedMoneyboxDetails = roundUp.decrypt
 
             val balanceToSave = decryptedMoneyboxDetails.roundUpBalance.setScale(0, RoundingMode.DOWN)
@@ -39,7 +41,7 @@ class SchedulerActor @Inject() (ws: WSClient) extends Actor {
               val headers = Seq("AppId" -> "8cb2237d0679ca88db6464", "AppVersion" -> "1.0.13", "Authorization" -> s"Bearer ${decryptedMoneyboxDetails.bearerToken}")
 
               Logger.info(
-                s"""[SchedulerActor][CheckForRoundUps] - balance before top up: £${decryptedMoneyboxDetails.roundUpBalance} - topping up: £$balanceToSave
+                s"""[SchedulerActor][CheckForRoundUps] - balance before top up: $poundSign${decryptedMoneyboxDetails.roundUpBalance} - topping up: $poundSign$balanceToSave
                    |  for account: ${decryptedMoneyboxDetails.monzoAccountId} - user: ${decryptedMoneyboxDetails.emailAddress}""".stripMargin)
 
               val body = Json.obj(
@@ -51,7 +53,7 @@ class SchedulerActor @Inject() (ws: WSClient) extends Actor {
               ws.url("https://api.moneyboxapp.com/payments").withHeaders(headers: _*).post(body).map {
                 case response if response.status == 200 =>
                   Logger.info(s"[SchedulerActor][CheckForRoundUps] - successful top up - ${response.status} - ${response.body}")
-                  Logger.info(s"[SchedulerActor][CheckForRoundUps] - Successfully topped up ${decryptedMoneyboxDetails.userId} with $balanceToSave")
+                  Logger.info(s"[SchedulerActor][CheckForRoundUps] - Successfully topped up ${decryptedMoneyboxDetails.userId} with $poundSign$balanceToSave")
                   moneyboxRepository.updateBalance(decryptedMoneyboxDetails.monzoAccountId, a => a - balanceToSave).map { _ =>
                     monzoRepository.findByAccountId(decryptedMoneyboxDetails.monzoAccountId).map { monzoAccount =>
                       sendMoneyboxTopUpFeedItem(
@@ -137,14 +139,15 @@ class SchedulerActor @Inject() (ws: WSClient) extends Actor {
   }
 
   def sendMoneyboxTopUpFeedItem(accessToken: String, accountId: String, amountToppedUp: BigDecimal): Future[WSResponse] = {
+    val poundSign = "\u00a3"
     val formattedRoundUp = amountToppedUp.setScale(2)
 
     val formData = Map(
       "account_id" -> Seq(accountId),
       "type" -> Seq("basic"),
       "url" -> Seq(""),
-      "params[title]" -> Seq(s"£$formattedRoundUp sent to Moneybox"),
-      "params[body]" -> Seq(s"We've just topped up £$formattedRoundUp to your Moneybox account."),
+      "params[title]" -> Seq(s"$poundSign$formattedRoundUp sent to Moneybox"),
+      "params[body]" -> Seq(s"We've just topped up $poundSign$formattedRoundUp to your Moneybox account."),
       "params[image_url]" -> Seq("https://www.oxcp.com/content/uploads/2016/07/Moneybox-small-440x390.png")
     )
 
