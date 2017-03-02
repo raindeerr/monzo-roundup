@@ -1,4 +1,5 @@
 # Continue using moneybox while also using Monzo!
+[![Build Status](https://travis-ci.org/adamtrousdale/monzo-roundup.svg?branch=master)](https://travis-ci.org/adamtrousdale/monzo-roundup)
 
 ## How it works
 
