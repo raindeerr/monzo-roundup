@@ -5,7 +5,7 @@ import play.api.Play
 import play.api.libs.json.Json
 import play.modules.reactivemongo.ReactiveMongoApi
 import play.modules.reactivemongo.json.ImplicitBSONHandlers._
-import reactivemongo.api.commands.WriteResult
+import reactivemongo.api.commands.{UpdateWriteResult, WriteResult}
 import reactivemongo.play.json.collection.JSONCollection
 
 import scala.concurrent.Future
@@ -52,7 +52,17 @@ trait MoneyboxRepository {
     } yield update
   }
 
-  def findAllForRoundup = {
+  def updatePreferences(monzoAccountId: String, wholePoundRoundUps: Boolean): Future[UpdateWriteResult] = {
+    val update = Json.obj(
+      "$set" -> Json.obj("onePoundRoundUps" -> wholePoundRoundUps)
+    )
+    for {
+      collection <- collectionFuture
+      update <- collection.update(Json.obj("monzoAccountId" -> monzoAccountId), update)
+    } yield update
+  }
+
+  def findAllForRoundup: Future[Seq[EncryptedMoneyboxAuth]] = {
     for {
       collection <- collectionFuture
       findAll <- collection.find(Json.obj("roundUpBalance" -> Json.obj("$gt" -> 1), "topupEnabled" -> true)).cursor[EncryptedMoneyboxAuth]().collect[Seq]()
