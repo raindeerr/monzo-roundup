@@ -5,7 +5,7 @@ import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test._
 import play.api.test.Helpers._
 
-class AuthControllerSpec extends PlaySpec with OneAppPerTest {
+class HomeControllerSpec extends PlaySpec with OneAppPerTest {
 
   val config = Map(
     "monzo.clientId" -> "testClientId",

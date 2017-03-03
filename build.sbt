@@ -12,3 +12,7 @@ libraryDependencies ++= Seq(
   "org.reactivemongo" %% "play2-reactivemongo" % "0.12.1",
   "org.scalatestplus.play" %% "scalatestplus-play" % "1.5.1" % Test
 )
+
+coverageEnabled := true
+
+coverageExcludedPackages := "<empty>;Reverse.*;app.Routes.*;prod.*;views.html.*;router.*;controllers.javascript.*"

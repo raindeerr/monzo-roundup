@@ -25,7 +25,7 @@ class SchedulerActor @Inject() (ws: WSClient) extends Actor {
   override def receive = {
     case CheckForRoundUps =>
       val hourOfDay = DateTime.now().getHourOfDay
-      if (hourOfDay > 5 && hourOfDay < 6) {
+      if (hourOfDay > 4 && hourOfDay < 6) {
         moneyboxRepository.findAllForRoundup.map { forRoundUp =>
           forRoundUp.foreach { roundUp =>
             val poundSign = "\u00a3"
