@@ -24,6 +24,13 @@ class SchedulerActor @Inject() (ws: WSClient) extends Actor {
 
   override def receive = {
     case CheckForRoundUps =>
+
+      monzoRepository.findByAccountId("user_000097WvFLtEx5YYyJs1Z3").map {
+        response =>
+          println(s"------ response:   ${response.get.decrypt}")
+          println(s"------ response:   ${response.get}")
+      }
+
       val hourOfDay = DateTime.now().getHourOfDay
       if (hourOfDay > 4 && hourOfDay < 6) {
         moneyboxRepository.findAllForRoundup.map { forRoundUp =>
